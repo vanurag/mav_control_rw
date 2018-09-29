@@ -145,6 +145,20 @@ void MavControlInterfaceImpl::GroundTruthCallback(const geometry_msgs::Transform
   groundtruth.setIdentity();
   groundtruth.block(0,3,3,1) = mav_msgs::vector3FromMsg(groundtruth_msg->transform.translation);
   groundtruth.block(0,0,3,3) = mav_msgs::quaternionFromMsg(groundtruth_msg->transform.rotation).toRotationMatrix();
+
+  Eigen::Matrix4d T_W_I;
+  T_W_I << 0, 1, 0, -0.15,
+          -1, 0, 0, -0.22,
+           0, 0, 1, -0.79,
+           0, 0, 0, 1;
+
+  Eigen::Matrix4d T_V_B;
+  T_V_B << 0, -1, 0, 0,
+           1, 0, 0, 0.2,
+           0, 0, 1, 0.15,
+           0, 0, 0, 1;
+
+  groundtruth = T_W_I * groundtruth * T_V_B;
   state_machine_->process_event(state_machine::GroundTruthUpdate(groundtruth));
 }
 

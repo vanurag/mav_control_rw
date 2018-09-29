@@ -601,8 +601,8 @@ private:
     template<class FSM, class SourceState, class TargetState>
     bool operator()(const OdometryWatchdog& evt, FSM& fsm, SourceState&, TargetState&)
     {
-      ROS_INFO("watchdog GT: ", fsm.current_groundtruth_.block(0,3,3,1));
-      ROS_INFO("watchdog current state pos: ", fsm.current_state_.position_W);
+      ROS_INFO_STREAM("watchdog GT: " << fsm.current_groundtruth_.block(0,3,3,1));
+      ROS_INFO_STREAM("watchdog current state pos: " << fsm.current_state_.position_W);
       if (std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_state_.timestamp_ns) > kOdometryOutdated_ns)
         return true;
 
