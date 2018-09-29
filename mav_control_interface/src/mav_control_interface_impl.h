@@ -23,6 +23,7 @@
 #include <ros/ros.h>
 #include <mav_msgs/eigen_mav_msgs.h>
 #include <nav_msgs/Odometry.h>
+#include <geometry_msgs/TransformStamped.h>
 #include <std_srvs/Empty.h>
 #include <trajectory_msgs/MultiDOFJointTrajectory.h>
 
@@ -50,6 +51,7 @@ class MavControlInterfaceImpl
   ros::NodeHandle private_nh_;
 
   ros::Subscriber odometry_subscriber_;
+  ros::Subscriber groundtruth_subscriber_;
   ros::Subscriber command_trajectory_subscriber_;
   ros::Subscriber command_trajectory_array_subscriber_;
   ros::Timer odometry_watchdog_;
@@ -64,6 +66,7 @@ class MavControlInterfaceImpl
   void CommandPoseCallback(const geometry_msgs::PoseStampedConstPtr& msg);
   void CommandTrajectoryCallback(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& msg);
   void OdometryCallback(const nav_msgs::OdometryConstPtr& msg);
+  void GroundTruthCallback(const geometry_msgs::TransformStampedConstPtr& groundtruth_msg);
   void OdometryWatchdogCallback(const ros::TimerEvent& e);
   void RcUpdatedCallback(const RcInterfaceBase&);
   bool TakeoffCallback(std_srvs::EmptyRequest& request, std_srvs::EmptyResponse& response);

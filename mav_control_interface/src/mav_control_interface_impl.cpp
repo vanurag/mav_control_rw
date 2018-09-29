@@ -51,6 +51,10 @@ MavControlInterfaceImpl::MavControlInterfaceImpl(ros::NodeHandle& nh, ros::NodeH
                                        &MavControlInterfaceImpl::OdometryCallback, this,
                                        ros::TransportHints().tcpNoDelay());
 
+  groundtruth_subscriber_ = nh_.subscribe(mav_msgs::default_topics::GROUND_TRUTH_TRANSFORM, 1,
+                                          &MavControlInterfaceImpl::GroundTruthCallback, this,
+                                          ros::TransportHints().tcpNoDelay());
+
   rc_interface_->registerUpdatedCallback(&MavControlInterfaceImpl::RcUpdatedCallback, this);
 
   takeoff_server_ = nh.advertiseService("takeoff", &MavControlInterfaceImpl::TakeoffCallback, this);
@@ -132,6 +136,16 @@ void MavControlInterfaceImpl::OdometryCallback(const nav_msgs::OdometryConstPtr&
   // Stamp odometry upon reception to be robust against timestamps "in the future".
   odometry.timestamp_ns = ros::Time::now().toNSec();
   state_machine_->process_event(state_machine::OdometryUpdate(odometry));
+}
+
+void MavControlInterfaceImpl::GroundTruthCallback(const geometry_msgs::TransformStampedConstPtr& groundtruth_msg)
+{
+  ROS_INFO_ONCE("Control interface got first groundtruth message.");
+  Eigen::Matrix4d groundtruth;
+  groundtruth.setIdentity();
+  groundtruth.block(0,3,3,1) = mav_msgs::vector3FromMsg(groundtruth_msg->transform.translation);
+  groundtruth.block(0,0,3,3) = mav_msgs::quaternionFromMsg(groundtruth_msg->transform.rotation).toRotationMatrix();
+  state_machine_->process_event(state_machine::GroundTruthUpdate(groundtruth));
 }
 
 void MavControlInterfaceImpl::OdometryWatchdogCallback(const ros::TimerEvent& e)

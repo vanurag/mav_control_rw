@@ -84,6 +84,16 @@ struct OdometryUpdate
   mav_msgs::EigenOdometry odometry;
 };
 
+struct GroundTruthUpdate
+{
+  GroundTruthUpdate(const Eigen::Matrix4d& _groundtruth)
+      : groundtruth(_groundtruth)
+  {
+  }
+
+  Eigen::Matrix4d groundtruth;
+};
+
 struct BackToPositionHold {};
 struct Takeoff {};
 struct OdometryWatchdog {};
@@ -113,6 +123,7 @@ class StateMachineDefinition : public msm_front::state_machine_def<StateMachineD
   struct SetReferencePosition;
   struct SetReferenceToCurrentPosition;
   struct SetOdometry;
+  struct SetGroundTruth;
   struct ComputeCommand;
   struct SetReferenceFromRc;
   struct SetTakeoffCommands;
@@ -150,6 +161,7 @@ class StateMachineDefinition : public msm_front::state_machine_def<StateMachineD
       msm_front::Row<Inactive, ReferenceUpdate, PositionHold, SetReferencePosition, NoRCTeleop>,
       msm_front::Row<Inactive, OdometryWatchdog, InternalTransition, PrintOdometryWatchdogWarning, OdometryOutdated >,
       msm_front::Row<Inactive, OdometryUpdate, InternalTransition, SetOdometry, NoGuard >,
+      msm_front::Row<Inactive, GroundTruthUpdate, InternalTransition, SetGroundTruth, NoGuard >,
       msm_front::Row<Inactive, Takeoff, PositionHold, SetTakeoffCommands, NoRCTeleop>,
       //  +---------+-------------+---------+---------------------------+----------------------+
       msm_front::Row<RemoteControl, RcUpdate, InternalTransition, SetReferenceAttitude, RcModeNotManual >,
@@ -159,10 +171,12 @@ class StateMachineDefinition : public msm_front::state_machine_def<StateMachineD
       msm_front::Row<RemoteControlReadyForOdometry, RcUpdate, RemoteControl, SetReferenceAttitude, RcModeNotManual >,
       msm_front::Row<RemoteControlReadyForOdometry, RcUpdate, InternalTransition, SetReferenceAttitude, RcModeManual >,
       msm_front::Row<RemoteControlReadyForOdometry, OdometryUpdate, HaveOdometry, SetOdometry, NoGuard >,
+      msm_front::Row<RemoteControlReadyForOdometry, GroundTruthUpdate, InternalTransition, SetGroundTruth, NoGuard >,
       msm_front::Row<RemoteControlReadyForOdometry, OdometryWatchdog, RemoteControl, PrintOdometryWatchdogWarning, OdometryOutdated >,
       //  +---------+-------------+---------+---------------------------+----------------------+
       msm_front::Row<HaveOdometry, RcUpdate, InternalTransition, SetReferenceAttitude, RcModeManual >,
       msm_front::Row<HaveOdometry, OdometryUpdate, InternalTransition, SetOdometry, NoGuard >,
+      msm_front::Row<HaveOdometry, GroundTruthUpdate, InternalTransition, SetGroundTruth, NoGuard >,
       msm_front::Row<HaveOdometry, OdometryWatchdog, RemoteControl, PrintOdometryWatchdogWarning, OdometryOutdated >,
       msm_front::Row<HaveOdometry, RcUpdate, PositionHold, SetReferenceToCurrentPosition, RcInactivePosition >,
       msm_front::Row<HaveOdometry, RcUpdate, RcTeleOp, SetReferenceFromRc, RcActivePosition >,
@@ -170,6 +184,7 @@ class StateMachineDefinition : public msm_front::state_machine_def<StateMachineD
       msm_front::Row<PositionHold, RcUpdate, RemoteControl, NoAction, RcModeManual>,
       msm_front::Row<PositionHold, RcUpdate, RcTeleOp, SetReferenceToCurrentPosition, RcActivePosition >,
       msm_front::Row<PositionHold, OdometryUpdate, InternalTransition, SetOdometryAndCompute, NoGuard>,
+      msm_front::Row<PositionHold, GroundTruthUpdate, InternalTransition, SetGroundTruth, NoGuard >,
       msm_front::Row<PositionHold, ReferenceUpdate, InternalTransition, SetReferencePosition, NoGuard >,
       msm_front::Row<PositionHold, OdometryWatchdog, RemoteControl, PrintOdometryWatchdogWarning, OdometryOutdated >,
       //  +---------+-------------+---------+---------------------------+----------------------+
@@ -179,6 +194,7 @@ class StateMachineDefinition : public msm_front::state_machine_def<StateMachineD
       msm_front::Row<RcTeleOp, RcUpdate, InternalTransition, SetReferenceFromRc, RcActivePosition >,
       //msm_front::Row<RcTeleOp, RcUpdate, InternalTransition, SetReferenceToCurrentPosition, RcInactivePosition >,
       msm_front::Row<RcTeleOp, OdometryUpdate, InternalTransition, SetOdometryAndCompute, NoGuard>,
+      msm_front::Row<RcTeleOp, GroundTruthUpdate, InternalTransition, SetGroundTruth, NoGuard >,
       msm_front::Row<RcTeleOp, OdometryWatchdog, RemoteControl, PrintOdometryWatchdogWarning, OdometryOutdated >
       >
   {
@@ -216,6 +232,7 @@ private:
   ros::Publisher full_predicted_state_publisher_;
   Parameters parameters_;
   mav_msgs::EigenOdometry current_state_;
+  Eigen::Matrix4d current_groundtruth_;
   mav_msgs::EigenTrajectoryPointDeque current_reference_queue_;
 
   void PublishAttitudeCommand(const mav_msgs::EigenRollPitchYawrateThrust& command) const;
@@ -333,6 +350,15 @@ private:
     {
       fsm.current_state_ = evt.odometry;
       fsm.controller_->setOdometry(evt.odometry);
+    }
+  };
+
+  struct SetGroundTruth
+  {
+    template<class FSM, class SourceState, class TargetState>
+    void operator()(const GroundTruthUpdate& evt, FSM& fsm, SourceState&, TargetState&)
+    {
+      fsm.current_groundtruth_ = evt.groundtruth;
     }
   };
 
@@ -575,7 +601,16 @@ private:
     template<class FSM, class SourceState, class TargetState>
     bool operator()(const OdometryWatchdog& evt, FSM& fsm, SourceState&, TargetState&)
     {
-      return std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_state_.timestamp_ns) > kOdometryOutdated_ns;
+      ROS_INFO("watchdog GT: ", fsm.current_groundtruth_.block(0,3,3,1));
+      ROS_INFO("watchdog current state pos: ", fsm.current_state_.position_W);
+      if (std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_state_.timestamp_ns) > kOdometryOutdated_ns)
+        return true;
+
+//      if (fsm.current_groundtruth_ - fsm.current_state_.position_W > norm) {
+//        return true;
+//      }
+
+      return false;
     }
   };
 
