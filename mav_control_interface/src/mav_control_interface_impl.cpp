@@ -51,7 +51,7 @@ MavControlInterfaceImpl::MavControlInterfaceImpl(ros::NodeHandle& nh, ros::NodeH
                                        &MavControlInterfaceImpl::OdometryCallback, this,
                                        ros::TransportHints().tcpNoDelay());
 
-  groundtruth_subscriber_ = nh_.subscribe(mav_msgs::default_topics::GROUND_TRUTH_TRANSFORM, 1,
+  groundtruth_subscriber_ = nh_.subscribe(mav_msgs::default_topics::GROUND_TRUTH_POSE, 1,
                                           &MavControlInterfaceImpl::GroundTruthCallback, this,
                                           ros::TransportHints().tcpNoDelay());
 
