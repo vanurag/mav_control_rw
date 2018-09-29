@@ -618,10 +618,10 @@ private:
       ROS_INFO_STREAM("watchdog GT: " << fsm.current_groundtruth_.block(0,3,3,1));
       ROS_INFO_STREAM("watchdog current state pos: " << Eigen::Matrix4d(T_W_B*T_B_V).block(0,3,3,1));
 
-//      if ((fsm.current_groundtruth_.block(0,3,3,1) - fsm.current_state_.position_W).norm() > 1.0) {
-//        ROS_WARN("State diverging from groundtruth!!!!");
-//        return true;
-//      }
+      if ((fsm.current_groundtruth_.block(0,3,3,1) - Eigen::Matrix4d(T_W_B*T_B_V).block(0,3,3,1)).norm() > 1.0) {
+        ROS_WARN("State diverging from groundtruth!!!!");
+        return true;
+      }
 
       return false;
     }

@@ -148,7 +148,7 @@ void MavControlInterfaceImpl::GroundTruthCallback(const geometry_msgs::Transform
 
   Eigen::Matrix4d T_W_I;
   T_W_I << 0.0112, 0.9963, 0.0851, -0.1500,
-      -0.9999, 0.0123, -0.0122, -0.2219,
+      -0.9999, 0.0123, -0.0122, 0.2219,
       -0.0132, -0.0850, 0.9963, -0.7904,
       0,         0,         0,    1.0000;
 
