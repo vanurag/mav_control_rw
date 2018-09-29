@@ -601,12 +601,25 @@ private:
     template<class FSM, class SourceState, class TargetState>
     bool operator()(const OdometryWatchdog& evt, FSM& fsm, SourceState&, TargetState&)
     {
-      ROS_INFO_STREAM("watchdog GT: " << fsm.current_groundtruth_.block(0,3,3,1));
-      ROS_INFO_STREAM("watchdog current state pos: " << fsm.current_state_.position_W);
       if (std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_state_.timestamp_ns) > kOdometryOutdated_ns)
         return true;
 
-//      if (fsm.current_groundtruth_ - fsm.current_state_.position_W > norm) {
+      Eigen::Matrix4d T_B_V;
+      T_B_V << 0, 1, 0, -0.2,
+               -1, 0, 0, 0,
+               0, 0, 1, -0.05,
+               0, 0, 0, 1;
+
+      Eigen::Matrix4d T_W_B;
+      T_W_B.setIdentity();
+      T_W_B.block(0,0,3,3) = fsm.current_state_.orientation_W_B.toRotationMatrix();
+      T_W_B.block(0,3,3,1) = fsm.current_state_.position_W;
+
+      ROS_INFO_STREAM("watchdog GT: " << fsm.current_groundtruth_.block(0,3,3,1));
+      ROS_INFO_STREAM("watchdog current state pos: " << Eigen::Matrix4d(T_W_B*T_B_V).block(0,3,3,1));
+
+//      if ((fsm.current_groundtruth_.block(0,3,3,1) - fsm.current_state_.position_W).norm() > 1.0) {
+//        ROS_WARN("State diverging from groundtruth!!!!");
 //        return true;
 //      }
 
