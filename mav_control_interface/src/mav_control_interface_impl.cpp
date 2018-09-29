@@ -141,18 +141,11 @@ void MavControlInterfaceImpl::OdometryCallback(const nav_msgs::OdometryConstPtr&
 void MavControlInterfaceImpl::GroundTruthCallback(const geometry_msgs::TransformStampedConstPtr& groundtruth_msg)
 {
   ROS_INFO_ONCE("Control interface got first groundtruth message.");
-  Eigen::Matrix4d groundtruth;
-  groundtruth.setIdentity();
-  groundtruth.block(0,3,3,1) = mav_msgs::vector3FromMsg(groundtruth_msg->transform.translation);
-  groundtruth.block(0,0,3,3) = mav_msgs::quaternionFromMsg(groundtruth_msg->transform.rotation).toRotationMatrix();
-
-  Eigen::Matrix4d T_W_I;
-  T_W_I << 0.0112, 0.9963, 0.0851, -0.1500,
-      -0.9999, 0.0123, -0.0122, 0.2219,
-      -0.0132, -0.0850, 0.9963, -0.7904,
-      0,         0,         0,    1.0000;
-
-  groundtruth = T_W_I * groundtruth;
+  mav_msgs::EigenOdometry groundtruth;
+  // Stamp odometry upon reception to be robust against timestamps "in the future".
+  groundtruth.timestamp_ns = ros::Time::now().toNSec();
+  groundtruth.position_W = mav_msgs::vector3FromMsg(groundtruth_msg->transform.translation);
+  groundtruth.orientation_W_B = mav_msgs::quaternionFromMsg(groundtruth_msg->transform.rotation);
   state_machine_->process_event(state_machine::GroundTruthUpdate(groundtruth));
 }
 

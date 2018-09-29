@@ -31,6 +31,8 @@
 #include <boost/msm/front/euml/common.hpp>
 #include <boost/msm/front/euml/operator.hpp>
 
+#include <utility>
+
 #include <mav_msgs/conversions.h>
 #include <mav_msgs/eigen_mav_msgs.h>
 #include <ros/ros.h>
@@ -86,12 +88,12 @@ struct OdometryUpdate
 
 struct GroundTruthUpdate
 {
-  GroundTruthUpdate(const Eigen::Matrix4d& _groundtruth)
+  GroundTruthUpdate(const mav_msgs::EigenOdometry& _groundtruth)
       : groundtruth(_groundtruth)
   {
   }
 
-  Eigen::Matrix4d groundtruth;
+  mav_msgs::EigenOdometry groundtruth;
 };
 
 struct BackToPositionHold {};
@@ -232,7 +234,7 @@ private:
   ros::Publisher full_predicted_state_publisher_;
   Parameters parameters_;
   mav_msgs::EigenOdometry current_state_;
-  Eigen::Matrix4d current_groundtruth_;
+  std::pair<int64_t, Eigen::Matrix4d> current_groundtruth_;
   mav_msgs::EigenTrajectoryPointDeque current_reference_queue_;
 
   void PublishAttitudeCommand(const mav_msgs::EigenRollPitchYawrateThrust& command) const;
@@ -358,7 +360,18 @@ private:
     template<class FSM, class SourceState, class TargetState>
     void operator()(const GroundTruthUpdate& evt, FSM& fsm, SourceState&, TargetState&)
     {
-      fsm.current_groundtruth_ = evt.groundtruth;
+      fsm.current_groundtruth_.first = evt.groundtruth.timestamp_ns;
+      fsm.current_groundtruth_.second.setIdentity();
+      fsm.current_groundtruth_.second.block(0,3,3,1) = evt.groundtruth.position_W;
+      fsm.current_groundtruth_.second.block(0,0,3,3) = evt.groundtruth.orientation_W_B.toRotationMatrix();
+
+      Eigen::Matrix4d T_W_I;
+      T_W_I << 0.0112, 0.9963, 0.0851, -0.1500,
+          -0.9999, 0.0123, -0.0122, 0.2219,
+          -0.0132, -0.0850, 0.9963, -0.7904,
+          0,         0,         0,    1.0000;
+
+      fsm.current_groundtruth_.second = T_W_I * fsm.current_groundtruth_.second;
     }
   };
 
@@ -604,6 +617,11 @@ private:
       if (std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_state_.timestamp_ns) > kOdometryOutdated_ns)
         return true;
 
+      if (std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_groundtruth_.first) > kOdometryOutdated_ns) {
+        ROS_WARN_STREAM("No groundtruth message received in the last "<< kOdometryOutdated_ns/1000000000.0 << " seconds!");
+        return true;
+      }
+
       Eigen::Matrix4d T_B_V;
       T_B_V << 0, 1, 0, -0.2,
                -1, 0, 0, 0,
@@ -615,10 +633,10 @@ private:
       T_W_B.block(0,0,3,3) = fsm.current_state_.orientation_W_B.toRotationMatrix();
       T_W_B.block(0,3,3,1) = fsm.current_state_.position_W;
 
-      ROS_INFO_STREAM("watchdog GT: " << fsm.current_groundtruth_.block(0,3,3,1));
+      ROS_INFO_STREAM("watchdog GT: " << fsm.current_groundtruth_.second.block(0,3,3,1));
       ROS_INFO_STREAM("watchdog current state pos: " << Eigen::Matrix4d(T_W_B*T_B_V).block(0,3,3,1));
 
-      if ((fsm.current_groundtruth_.block(0,3,3,1) - Eigen::Matrix4d(T_W_B*T_B_V).block(0,3,3,1)).norm() > 1.0) {
+      if ((fsm.current_groundtruth_.second.block(0,3,3,1) - Eigen::Matrix4d(T_W_B*T_B_V).block(0,3,3,1)).norm() > 1.0) {
         ROS_WARN("State diverging from groundtruth!!!!");
         return true;
       }
