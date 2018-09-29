@@ -129,6 +129,7 @@ class StateMachineDefinition : public msm_front::state_machine_def<StateMachineD
   struct ComputeCommand;
   struct SetReferenceFromRc;
   struct SetTakeoffCommands;
+  struct SetEmergencyLandingCommand;
   struct PrintOdometryWatchdogWarning;
 
   // Guards
@@ -151,6 +152,7 @@ class StateMachineDefinition : public msm_front::state_machine_def<StateMachineD
   typedef euml::And_<RcActive, RcModePosition> RcActivePosition;
   typedef euml::And_<RcInactive, RcModePosition> RcInactivePosition;
   typedef euml::Not_<RcModeManual> RcModeNotManual;
+  typedef euml::And_<PrintOdometryWatchdogWarning, SetEmergencyLandingCommand> PrintOdometryWatchdogWarningAndLand;
   typedef msm_front::none InternalTransition;
   typedef msm_front::none NoAction;
   typedef msm_front::none NoGuard;
@@ -543,6 +545,22 @@ private:
       ROS_INFO_STREAM("final take off position: " << trajectory_point.position_W.transpose());
       //fsm.controller_->setReferenceArray(current_reference_queue);
       fsm.controller_->setReference(trajectory_point);
+    }
+  };
+
+  struct SetEmergencyLandingCommand
+  {
+    template<class FSM, class Evt, class SourceState, class TargetState>
+    void operator()(const Evt& evt, FSM& fsm, SourceState&, TargetState&)
+    {
+      mav_msgs::EigenRollPitchYawrateThrust command;
+      command.pitch = 0.0;
+      command.roll = 0.0;
+      command.yaw_rate = 0.0;
+      constexpr double thrust_below_hovering_factor = 0.8;
+      constexpr double throttle_down_extent = -0.2;
+      command.thrust.z() = (throttle_down_extent + 1.0) * fsm.controller_->getMass() * 9.81 * thrust_below_hovering_factor;
+      fsm.PublishAttitudeCommand(command);
     }
   };
 
