@@ -37,6 +37,7 @@
 #include <mav_msgs/eigen_mav_msgs.h>
 #include <ros/ros.h>
 #include <tf/transform_broadcaster.h>
+#include <sound_play/SoundRequest.h>
 
 #include <mav_control_interface/position_controller_interface.h>
 #include <mav_control_interface/rc_interface.h>
@@ -230,6 +231,7 @@ private:
   std::shared_ptr<PositionControllerInterface> controller_;
   ros::Publisher command_publisher_;
   ros::Publisher state_info_publisher_;
+  ros::Publisher sound_publisher_;
 
   tf::TransformBroadcaster transform_broadcaster_;
   ros::Publisher current_reference_publisher_;
@@ -239,6 +241,7 @@ private:
   mav_msgs::EigenOdometry current_state_;
   std::pair<int64_t, Eigen::Matrix4d> current_groundtruth_;
   mav_msgs::EigenTrajectoryPointDeque current_reference_queue_;
+  sound_play::SoundRequest sound_request_;
 
   void PublishAttitudeCommand(const mav_msgs::EigenRollPitchYawrateThrust& command) const;
   void PublishStateInfo(const std::string& info);
@@ -625,6 +628,8 @@ private:
       if (std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_groundtruth_.first) > 5.0*kOdometryOutdated_ns) {
         ROS_WARN_STREAM("No groundtruth message received in the last "<< kOdometryOutdated_ns/1000000000.0 << " seconds!");
         ROS_FATAL("BUT REMOVED TRIGGER, SO NOTHING SHOULD HAPPEN!!");
+        fsm.sound_request_.arg = 'Groundtruth lost. Triggering e-stop.';
+        fsm.sound_publisher_.publish(fsm.sound_request_);
 //        return true;
         return false;
       }
@@ -648,6 +653,8 @@ private:
       if (state_divergence > 1.0) {
         ROS_WARN("State diverging from groundtruth!!!!");
         ROS_FATAL("BUT REMOVED TRIGGER, SO NOTHING SHOULD HAPPEN!!");
+        fsm.sound_request_.arg = 'State diverging. Triggering e-stop.';
+        fsm.sound_publisher_.publish(fsm.sound_request_);
         return false;
 //        return true;
       }

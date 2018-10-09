@@ -39,6 +39,10 @@ StateMachineDefinition::StateMachineDefinition(const ros::NodeHandle& nh, const 
 
   state_info_publisher_ = nh_.advertise<std_msgs::String>("state_machine/state_info", 1, true);
 
+  sound_publisher_ = nh_.advertise<sound_play::SoundRequest>("/robotsound", 1);
+  sound_request_.command = 1; // say once
+  sound_request_.sound = -3;  // say text
+
   private_nh_.param<bool>("use_rc_teleop", use_rc_teleop_, true);
   private_nh_.param<std::string>("reference_frame", reference_frame_id_, "odom");
   predicted_state_publisher_ = nh_.advertise<visualization_msgs::Marker>( "predicted_state", 0 );
