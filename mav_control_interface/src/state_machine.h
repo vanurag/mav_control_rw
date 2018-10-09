@@ -628,7 +628,7 @@ private:
       if (std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_groundtruth_.first) > 5.0*kOdometryOutdated_ns) {
         ROS_WARN_STREAM("No groundtruth message received in the last "<< kOdometryOutdated_ns/1000000000.0 << " seconds!");
         ROS_FATAL("BUT REMOVED TRIGGER, SO NOTHING SHOULD HAPPEN!!");
-        fsm.sound_request_.arg = 'Groundtruth lost. Triggering e-stop.';
+        fsm.sound_request_.arg = "groundtruth lost";
         fsm.sound_publisher_.publish(fsm.sound_request_);
 //        return true;
         return false;
@@ -653,7 +653,7 @@ private:
       if (state_divergence > 1.0) {
         ROS_WARN("State diverging from groundtruth!!!!");
         ROS_FATAL("BUT REMOVED TRIGGER, SO NOTHING SHOULD HAPPEN!!");
-        fsm.sound_request_.arg = 'State diverging. Triggering e-stop.';
+        fsm.sound_request_.arg = "state diverging";
         fsm.sound_publisher_.publish(fsm.sound_request_);
         return false;
 //        return true;
