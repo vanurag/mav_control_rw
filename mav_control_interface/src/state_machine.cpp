@@ -42,6 +42,7 @@ StateMachineDefinition::StateMachineDefinition(const ros::NodeHandle& nh, const 
   sound_publisher_ = nh_.advertise<sound_play::SoundRequest>("/robotsound", 1);
   sound_request_.command = 1; // say once
   sound_request_.sound = -3;  // say text
+  alert_counter_ = 0; // voice alert counter
 
   geo_fence_publisher_ = nh_.advertise<visualization_msgs::Marker>("geo_fence", 1);
 

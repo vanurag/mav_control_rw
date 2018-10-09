@@ -243,6 +243,7 @@ private:
   std::pair<int64_t, Eigen::Matrix4d> current_groundtruth_, current_groundtruth_I_;
   mav_msgs::EigenTrajectoryPointDeque current_reference_queue_;
   sound_play::SoundRequest sound_request_;
+  int alert_counter_;
   visualization_msgs::Marker geo_fence_marker_;
   // Operational space
   struct OperationSpace {
@@ -648,8 +649,11 @@ private:
       if (std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_groundtruth_.first) > 5.0*kOdometryOutdated_ns) {
         ROS_WARN_STREAM("No groundtruth message received in the last "<< kOdometryOutdated_ns/1000000000.0 << " seconds!");
         ROS_FATAL("BUT REMOVED TRIGGER, SO NOTHING SHOULD HAPPEN!!");
-        fsm.sound_request_.arg = "groundtruth lost";
-        fsm.sound_publisher_.publish(fsm.sound_request_);
+        if (fsm.alert_counter_ % 4 == 0) {
+          fsm.sound_request_.arg = "groundtruth lost";
+          fsm.sound_publisher_.publish(fsm.sound_request_);
+        }
+        fsm.alert_counter_++;
 //        return true;
         return false;
       }
@@ -665,8 +669,11 @@ private:
           fsm.current_groundtruth_I_.second(2,3) >= fsm.geo_fence_.z_range.second) {
         ROS_WARN_STREAM("MAV outside the geo-fence!");
         ROS_FATAL("BUT REMOVED TRIGGER, SO NOTHING SHOULD HAPPEN!!");
-        fsm.sound_request_.arg = "fence breached";
-        fsm.sound_publisher_.publish(fsm.sound_request_);
+        if (fsm.alert_counter_ % 4 == 0) {
+          fsm.sound_request_.arg = "fence breached";
+          fsm.sound_publisher_.publish(fsm.sound_request_);
+        }
+        fsm.alert_counter_++;
 //        return true;
         return false;
       }
@@ -689,12 +696,16 @@ private:
       if (state_divergence > 1.0) {
         ROS_WARN("State diverging from groundtruth!!!!");
         ROS_FATAL("BUT REMOVED TRIGGER, SO NOTHING SHOULD HAPPEN!!");
-        fsm.sound_request_.arg = "state diverging";
-        fsm.sound_publisher_.publish(fsm.sound_request_);
+        if (fsm.alert_counter_ % 4 == 0) {
+          fsm.sound_request_.arg = "state diverging";
+          fsm.sound_publisher_.publish(fsm.sound_request_);
+        }
+        fsm.alert_counter_++;
         return false;
 //        return true;
       }
 
+      fsm.alert_counter_ = 0;
       return false;
     }
   };
