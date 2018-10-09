@@ -43,11 +43,46 @@ StateMachineDefinition::StateMachineDefinition(const ros::NodeHandle& nh, const 
   sound_request_.command = 1; // say once
   sound_request_.sound = -3;  // say text
 
+  geo_fence_publisher_ = nh_.advertise<visualization_msgs::Marker>("geo_fence", 1);
+
+  geo_fence_.x_range.first = -3.85;
+  geo_fence_.x_range.second = 0.95;
+  geo_fence_.y_range.first = -2.35;
+  geo_fence_.y_range.second = 1.65;
+  geo_fence_.z_range.first = 0.5;
+  geo_fence_.z_range.second = 6.0;
+
   private_nh_.param<bool>("use_rc_teleop", use_rc_teleop_, true);
   private_nh_.param<std::string>("reference_frame", reference_frame_id_, "odom");
   predicted_state_publisher_ = nh_.advertise<visualization_msgs::Marker>( "predicted_state", 0 );
   full_predicted_state_publisher_ = 
     nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>( "full_predicted_state", 1 );
+
+  visualization_msgs::Marker marker;
+  marker.header.frame_id = "/world";
+  marker.header.stamp = ros::Time::now();
+  marker.ns = "geo_fence";
+  marker.type = visualization_msgs::Marker::CUBE;
+
+  marker.pose.position.x = (geo_fence_.x_range.first+geo_fence_.x_range.second)/2.0;
+  marker.pose.position.y = (geo_fence_.y_range.first+geo_fence_.y_range.second)/2.0;
+  marker.pose.position.z = (geo_fence_.z_range.first+geo_fence_.z_range.second)/2.0;
+  marker.pose.orientation.x = 0;
+  marker.pose.orientation.y = 0;
+  marker.pose.orientation.z = 0;
+  marker.pose.orientation.w = 1;
+
+  marker.scale.x = geo_fence_.x_range.second-geo_fence_.x_range.first;
+  marker.scale.y = geo_fence_.y_range.second-geo_fence_.y_range.first;
+  marker.scale.z = geo_fence_.z_range.second-geo_fence_.z_range.first;
+
+  marker.color.r = 0.0f;
+  marker.color.g = 1.0f;
+  marker.color.b = 0.0f;
+  marker.color.a = 0.1;
+
+  marker.lifetime = ros::Duration();
+  geo_fence_publisher_.publish(marker);
 }
 
 void StateMachineDefinition::SetParameters(const Parameters& parameters)

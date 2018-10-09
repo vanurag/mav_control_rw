@@ -232,6 +232,7 @@ private:
   ros::Publisher command_publisher_;
   ros::Publisher state_info_publisher_;
   ros::Publisher sound_publisher_;
+  ros::Publisher geo_fence_publisher_;
 
   tf::TransformBroadcaster transform_broadcaster_;
   ros::Publisher current_reference_publisher_;
@@ -242,6 +243,22 @@ private:
   std::pair<int64_t, Eigen::Matrix4d> current_groundtruth_;
   mav_msgs::EigenTrajectoryPointDeque current_reference_queue_;
   sound_play::SoundRequest sound_request_;
+  // Operational space
+  struct OperationSpace {
+    std::pair<double,double> x_range;
+    std::pair<double,double> y_range;
+    std::pair<double,double> z_range;
+
+    OperationSpace() {
+      x_range.first = -10.0;
+      x_range.second = 10.0;
+      y_range.first = -10.0;
+      y_range.second = 10.0;
+      z_range.first = 0.1;
+      z_range.second = 4.0;
+    }
+
+  } geo_fence_;
 
   void PublishAttitudeCommand(const mav_msgs::EigenRollPitchYawrateThrust& command) const;
   void PublishStateInfo(const std::string& info);
@@ -629,6 +646,20 @@ private:
         ROS_WARN_STREAM("No groundtruth message received in the last "<< kOdometryOutdated_ns/1000000000.0 << " seconds!");
         ROS_FATAL("BUT REMOVED TRIGGER, SO NOTHING SHOULD HAPPEN!!");
         fsm.sound_request_.arg = "groundtruth lost";
+        fsm.sound_publisher_.publish(fsm.sound_request_);
+//        return true;
+        return false;
+      }
+
+      if (fsm.current_groundtruth_.second(0,3) <= fsm.geo_fence_.x_range.first ||
+          fsm.current_groundtruth_.second(0,3) >= fsm.geo_fence_.x_range.second ||
+          fsm.current_groundtruth_.second(1,3) <= fsm.geo_fence_.y_range.first ||
+          fsm.current_groundtruth_.second(1,3) >= fsm.geo_fence_.y_range.second ||
+          fsm.current_groundtruth_.second(2,3) <= fsm.geo_fence_.z_range.first ||
+          fsm.current_groundtruth_.second(2,3) >= fsm.geo_fence_.z_range.second) {
+        ROS_WARN_STREAM("MAV outside the geo-fence!");
+        ROS_FATAL("BUT REMOVED TRIGGER, SO NOTHING SHOULD HAPPEN!!");
+        fsm.sound_request_.arg = "fence breached";
         fsm.sound_publisher_.publish(fsm.sound_request_);
 //        return true;
         return false;
