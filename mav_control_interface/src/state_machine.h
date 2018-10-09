@@ -243,6 +243,7 @@ private:
   std::pair<int64_t, Eigen::Matrix4d> current_groundtruth_;
   mav_msgs::EigenTrajectoryPointDeque current_reference_queue_;
   sound_play::SoundRequest sound_request_;
+  visualization_msgs::Marker geo_fence_marker_;
   // Operational space
   struct OperationSpace {
     std::pair<double,double> x_range;
@@ -637,6 +638,7 @@ private:
     template<class FSM, class SourceState, class TargetState>
     bool operator()(const OdometryWatchdog& evt, FSM& fsm, SourceState&, TargetState&)
     {
+      fsm.geo_fence_publisher_.publish(fsm.geo_fence_marker_);
       if (std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_state_.timestamp_ns) > kOdometryOutdated_ns) {
         ROS_WARN_STREAM("No odometry message received in the last "<< kOdometryOutdated_ns/1000000000.0 << " seconds!");
         return true;

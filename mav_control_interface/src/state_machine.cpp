@@ -58,31 +58,29 @@ StateMachineDefinition::StateMachineDefinition(const ros::NodeHandle& nh, const 
   full_predicted_state_publisher_ = 
     nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>( "full_predicted_state", 1 );
 
-  visualization_msgs::Marker marker;
-  marker.header.frame_id = "/world";
-  marker.header.stamp = ros::Time::now();
-  marker.ns = "geo_fence";
-  marker.type = visualization_msgs::Marker::CUBE;
+  geo_fence_marker_.header.frame_id = "/world";
+  geo_fence_marker_.header.stamp = ros::Time::now();
+  geo_fence_marker_.ns = "geo_fence";
+  geo_fence_marker_.type = visualization_msgs::Marker::CUBE;
 
-  marker.pose.position.x = (geo_fence_.x_range.first+geo_fence_.x_range.second)/2.0;
-  marker.pose.position.y = (geo_fence_.y_range.first+geo_fence_.y_range.second)/2.0;
-  marker.pose.position.z = (geo_fence_.z_range.first+geo_fence_.z_range.second)/2.0;
-  marker.pose.orientation.x = 0;
-  marker.pose.orientation.y = 0;
-  marker.pose.orientation.z = 0;
-  marker.pose.orientation.w = 1;
+  geo_fence_marker_.pose.position.x = (geo_fence_.x_range.first+geo_fence_.x_range.second)/2.0;
+  geo_fence_marker_.pose.position.y = (geo_fence_.y_range.first+geo_fence_.y_range.second)/2.0;
+  geo_fence_marker_.pose.position.z = (geo_fence_.z_range.first+geo_fence_.z_range.second)/2.0;
+  geo_fence_marker_.pose.orientation.x = 0;
+  geo_fence_marker_.pose.orientation.y = 0;
+  geo_fence_marker_.pose.orientation.z = 0;
+  geo_fence_marker_.pose.orientation.w = 1;
 
-  marker.scale.x = geo_fence_.x_range.second-geo_fence_.x_range.first;
-  marker.scale.y = geo_fence_.y_range.second-geo_fence_.y_range.first;
-  marker.scale.z = geo_fence_.z_range.second-geo_fence_.z_range.first;
+  geo_fence_marker_.scale.x = geo_fence_.x_range.second-geo_fence_.x_range.first;
+  geo_fence_marker_.scale.y = geo_fence_.y_range.second-geo_fence_.y_range.first;
+  geo_fence_marker_.scale.z = geo_fence_.z_range.second-geo_fence_.z_range.first;
 
-  marker.color.r = 0.0f;
-  marker.color.g = 1.0f;
-  marker.color.b = 0.0f;
-  marker.color.a = 0.1;
+  geo_fence_marker_.color.r = 0.0f;
+  geo_fence_marker_.color.g = 1.0f;
+  geo_fence_marker_.color.b = 0.0f;
+  geo_fence_marker_.color.a = 0.1;
 
-  marker.lifetime = ros::Duration();
-  geo_fence_publisher_.publish(marker);
+  geo_fence_marker_.lifetime = ros::Duration();
 }
 
 void StateMachineDefinition::SetParameters(const Parameters& parameters)
