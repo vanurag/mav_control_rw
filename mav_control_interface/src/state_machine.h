@@ -240,7 +240,7 @@ private:
   ros::Publisher full_predicted_state_publisher_;
   Parameters parameters_;
   mav_msgs::EigenOdometry current_state_;
-  std::pair<int64_t, Eigen::Matrix4d> current_groundtruth_;
+  std::pair<int64_t, Eigen::Matrix4d> current_groundtruth_, current_groundtruth_I_;
   mav_msgs::EigenTrajectoryPointDeque current_reference_queue_;
   sound_play::SoundRequest sound_request_;
   visualization_msgs::Marker geo_fence_marker_;
@@ -385,9 +385,10 @@ private:
     void operator()(const GroundTruthUpdate& evt, FSM& fsm, SourceState&, TargetState&)
     {
       fsm.current_groundtruth_.first = evt.groundtruth.timestamp_ns;
-      fsm.current_groundtruth_.second.setIdentity();
-      fsm.current_groundtruth_.second.block(0,3,3,1) = evt.groundtruth.position_W;
-      fsm.current_groundtruth_.second.block(0,0,3,3) = evt.groundtruth.orientation_W_B.toRotationMatrix();
+      fsm.current_groundtruth_I_.first = evt.groundtruth.timestamp_ns;
+      fsm.current_groundtruth_I_.second.setIdentity();
+      fsm.current_groundtruth_I_.second.block(0,3,3,1) = evt.groundtruth.position_W;
+      fsm.current_groundtruth_I_.second.block(0,0,3,3) = evt.groundtruth.orientation_W_B.toRotationMatrix();
 
       Eigen::Matrix4d T_W_I;
       T_W_I << 0.0112, 0.9963, 0.0851, -0.2192,
@@ -395,7 +396,7 @@ private:
           -0.0132, -0.0850, 0.9963, -0.7718,
           0,         0,         0,    1.0000;
 
-      fsm.current_groundtruth_.second = T_W_I * fsm.current_groundtruth_.second;
+      fsm.current_groundtruth_.second = T_W_I * fsm.current_groundtruth_I_.second;
     }
   };
 
@@ -653,12 +654,15 @@ private:
         return false;
       }
 
-      if (fsm.current_groundtruth_.second(0,3) <= fsm.geo_fence_.x_range.first ||
-          fsm.current_groundtruth_.second(0,3) >= fsm.geo_fence_.x_range.second ||
-          fsm.current_groundtruth_.second(1,3) <= fsm.geo_fence_.y_range.first ||
-          fsm.current_groundtruth_.second(1,3) >= fsm.geo_fence_.y_range.second ||
-          fsm.current_groundtruth_.second(2,3) <= fsm.geo_fence_.z_range.first ||
-          fsm.current_groundtruth_.second(2,3) >= fsm.geo_fence_.z_range.second) {
+      ROS_INFO_STREAM("watchdog GT in W frame: " << fsm.current_groundtruth_.second.block(0,3,3,1));
+      ROS_INFO_STREAM("watchdog GT in I frame: " << fsm.current_groundtruth_I_.second.block(0,3,3,1));
+
+      if (fsm.current_groundtruth_I_.second(0,3) <= fsm.geo_fence_.x_range.first ||
+          fsm.current_groundtruth_I_.second(0,3) >= fsm.geo_fence_.x_range.second ||
+          fsm.current_groundtruth_I_.second(1,3) <= fsm.geo_fence_.y_range.first ||
+          fsm.current_groundtruth_I_.second(1,3) >= fsm.geo_fence_.y_range.second ||
+          fsm.current_groundtruth_I_.second(2,3) <= fsm.geo_fence_.z_range.first ||
+          fsm.current_groundtruth_I_.second(2,3) >= fsm.geo_fence_.z_range.second) {
         ROS_WARN_STREAM("MAV outside the geo-fence!");
         ROS_FATAL("BUT REMOVED TRIGGER, SO NOTHING SHOULD HAPPEN!!");
         fsm.sound_request_.arg = "fence breached";
@@ -679,7 +683,6 @@ private:
       T_W_B.block(0,3,3,1) = fsm.current_state_.position_W;
       double state_divergence = (fsm.current_groundtruth_.second.block(0,3,3,1) - Eigen::Matrix4d(T_W_B*T_B_V).block(0,3,3,1)).norm();
 
-      ROS_INFO_STREAM("watchdog GT: " << fsm.current_groundtruth_.second.block(0,3,3,1));
       ROS_INFO_STREAM("watchdog current state pos: " << Eigen::Matrix4d(T_W_B*T_B_V).block(0,3,3,1));
       ROS_INFO_STREAM("state divergence: " << state_divergence);
 
