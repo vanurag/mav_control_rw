@@ -62,6 +62,9 @@ struct RcUpdate
   {
   }
   RcData rc_data;
+
+//  ROS_FATAL_STREAM("RC_DATA: " << rc_data.control_interface);
+
   bool is_active;
   bool is_on;
 };
@@ -129,7 +132,6 @@ class StateMachineDefinition : public msm_front::state_machine_def<StateMachineD
   struct ComputeCommand;
   struct SetReferenceFromRc;
   struct SetTakeoffCommands;
-  struct SetEmergencyLandingCommand;
   struct PrintOdometryWatchdogWarning;
 
   // Guards
@@ -152,7 +154,6 @@ class StateMachineDefinition : public msm_front::state_machine_def<StateMachineD
   typedef euml::And_<RcActive, RcModePosition> RcActivePosition;
   typedef euml::And_<RcInactive, RcModePosition> RcInactivePosition;
   typedef euml::Not_<RcModeManual> RcModeNotManual;
-  typedef euml::And_<PrintOdometryWatchdogWarning, SetEmergencyLandingCommand> PrintOdometryWatchdogWarningAndLand;
   typedef msm_front::none InternalTransition;
   typedef msm_front::none NoAction;
   typedef msm_front::none NoGuard;
@@ -311,7 +312,7 @@ private:
       command.pitch = evt.rc_data.right_up_down * fsm.parameters_.rc_max_roll_pitch_command_;
       command.roll = evt.rc_data.right_side * fsm.parameters_.rc_max_roll_pitch_command_;
       command.yaw_rate = -evt.rc_data.left_side * fsm.parameters_.rc_max_yaw_rate_command_;
-      constexpr double thrust_below_hovering_factor = 0.8;
+      constexpr double thrust_below_hovering_factor = 0.9;
       command.thrust.z() = (evt.rc_data.left_up_down + 1.0) * fsm.controller_->getMass() * 9.81 * thrust_below_hovering_factor;
       fsm.PublishAttitudeCommand(command);
     }
@@ -368,9 +369,9 @@ private:
       fsm.current_groundtruth_.second.block(0,0,3,3) = evt.groundtruth.orientation_W_B.toRotationMatrix();
 
       Eigen::Matrix4d T_W_I;
-      T_W_I << 0.0112, 0.9963, 0.0851, -0.1500,
-          -0.9999, 0.0123, -0.0122, 0.2219,
-          -0.0132, -0.0850, 0.9963, -0.7904,
+      T_W_I << 0.0112, 0.9963, 0.0851, -0.2192,
+          -0.9999, 0.0123, -0.0122, 0.2297,
+          -0.0132, -0.0850, 0.9963, -0.7718,
           0,         0,         0,    1.0000;
 
       fsm.current_groundtruth_.second = T_W_I * fsm.current_groundtruth_.second;
@@ -548,22 +549,6 @@ private:
     }
   };
 
-  struct SetEmergencyLandingCommand
-  {
-    template<class FSM, class Evt, class SourceState, class TargetState>
-    void operator()(const Evt& evt, FSM& fsm, SourceState&, TargetState&)
-    {
-      mav_msgs::EigenRollPitchYawrateThrust command;
-      command.pitch = 0.0;
-      command.roll = 0.0;
-      command.yaw_rate = 0.0;
-      constexpr double thrust_below_hovering_factor = 0.8;
-      constexpr double throttle_down_extent = -0.2;
-      command.thrust.z() = (throttle_down_extent + 1.0) * fsm.controller_->getMass() * 9.81 * thrust_below_hovering_factor;
-      fsm.PublishAttitudeCommand(command);
-    }
-  };
-
   struct PrintOdometryWatchdogWarning
   {
     template<class FSM, class Evt, class SourceState, class TargetState>
@@ -632,31 +617,39 @@ private:
     template<class FSM, class SourceState, class TargetState>
     bool operator()(const OdometryWatchdog& evt, FSM& fsm, SourceState&, TargetState&)
     {
-      if (std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_state_.timestamp_ns) > kOdometryOutdated_ns)
-        return true;
-
-      if (std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_groundtruth_.first) > kOdometryOutdated_ns) {
-        ROS_WARN_STREAM("No groundtruth message received in the last "<< kOdometryOutdated_ns/1000000000.0 << " seconds!");
+      if (std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_state_.timestamp_ns) > kOdometryOutdated_ns) {
+        ROS_WARN_STREAM("No odometry message received in the last "<< kOdometryOutdated_ns/1000000000.0 << " seconds!");
         return true;
       }
 
+      if (std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_groundtruth_.first) > 5.0*kOdometryOutdated_ns) {
+        ROS_WARN_STREAM("No groundtruth message received in the last "<< kOdometryOutdated_ns/1000000000.0 << " seconds!");
+        ROS_FATAL("BUT REMOVED TRIGGER, SO NOTHING SHOULD HAPPEN!!");
+//        return true;
+        return false;
+      }
+
       Eigen::Matrix4d T_B_V;
-      T_B_V << 0, 1, 0, -0.2,
-               -1, 0, 0, 0,
-               0, 0, 1, -0.05,
-               0, 0, 0, 1;
+      T_B_V << 0.0519, 0.9916, 0.1186, -0.2173,
+              -0.9972, 0.0579, -0.0477, -0.0118,
+              -0.0542, -0.1158, 0.9918, -0.0576,
+                    0,       0,      0,  1.0000;
 
       Eigen::Matrix4d T_W_B;
       T_W_B.setIdentity();
       T_W_B.block(0,0,3,3) = fsm.current_state_.orientation_W_B.toRotationMatrix();
       T_W_B.block(0,3,3,1) = fsm.current_state_.position_W;
+      double state_divergence = (fsm.current_groundtruth_.second.block(0,3,3,1) - Eigen::Matrix4d(T_W_B*T_B_V).block(0,3,3,1)).norm();
 
       ROS_INFO_STREAM("watchdog GT: " << fsm.current_groundtruth_.second.block(0,3,3,1));
       ROS_INFO_STREAM("watchdog current state pos: " << Eigen::Matrix4d(T_W_B*T_B_V).block(0,3,3,1));
+      ROS_INFO_STREAM("state divergence: " << state_divergence);
 
-      if ((fsm.current_groundtruth_.second.block(0,3,3,1) - Eigen::Matrix4d(T_W_B*T_B_V).block(0,3,3,1)).norm() > 1.0) {
+      if (state_divergence > 1.0) {
         ROS_WARN("State diverging from groundtruth!!!!");
-        return true;
+        ROS_FATAL("BUT REMOVED TRIGGER, SO NOTHING SHOULD HAPPEN!!");
+        return false;
+//        return true;
       }
 
       return false;
