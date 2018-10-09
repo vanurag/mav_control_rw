@@ -47,10 +47,10 @@ StateMachineDefinition::StateMachineDefinition(const ros::NodeHandle& nh, const 
 
   geo_fence_.x_range.first = -3.85;
   geo_fence_.x_range.second = 0.95;
-  geo_fence_.y_range.first = -2.35;
+  geo_fence_.y_range.first = -3.0;
   geo_fence_.y_range.second = 1.65;
-  geo_fence_.z_range.first = 0.5;
-  geo_fence_.z_range.second = 6.0;
+  geo_fence_.z_range.first = 0.0;
+  geo_fence_.z_range.second = 5.5;
 
   private_nh_.param<bool>("use_rc_teleop", use_rc_teleop_, true);
   private_nh_.param<std::string>("reference_frame", reference_frame_id_, "odom");
