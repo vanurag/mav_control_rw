@@ -58,6 +58,7 @@ MavControlInterfaceImpl::MavControlInterfaceImpl(ros::NodeHandle& nh, ros::NodeH
   rc_interface_->registerUpdatedCallback(&MavControlInterfaceImpl::RcUpdatedCallback, this);
 
   takeoff_server_ = nh.advertiseService("takeoff", &MavControlInterfaceImpl::TakeoffCallback, this);
+  autoland_server_ = nh.advertiseService("autoland", &MavControlInterfaceImpl::AutolandCallback, this);
   back_to_position_hold_server_ = nh.advertiseService("back_to_position_hold",
                                                       &MavControlInterfaceImpl::BackToPositionHoldCallback,
                                                       this);
@@ -159,6 +160,14 @@ bool MavControlInterfaceImpl::TakeoffCallback(std_srvs::Empty::Request& request,
 {
   ROS_INFO("Take off event sent");
   state_machine_->process_event(state_machine::Takeoff());
+  return true;
+}
+
+bool MavControlInterfaceImpl::AutolandCallback(std_srvs::Empty::Request& request,
+                                               std_srvs::Empty::Response& response)
+{
+  ROS_INFO("Auto-land event sent");
+  state_machine_->process_event(state_machine::Autoland());
   return true;
 }
 

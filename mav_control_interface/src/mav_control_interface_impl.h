@@ -57,6 +57,7 @@ class MavControlInterfaceImpl
   ros::Timer odometry_watchdog_;
 
   ros::ServiceServer takeoff_server_;
+  ros::ServiceServer autoland_server_;
   ros::ServiceServer back_to_position_hold_server_;
 
   std::shared_ptr<RcInterfaceBase> rc_interface_;
@@ -70,6 +71,7 @@ class MavControlInterfaceImpl
   void OdometryWatchdogCallback(const ros::TimerEvent& e);
   void RcUpdatedCallback(const RcInterfaceBase&);
   bool TakeoffCallback(std_srvs::EmptyRequest& request, std_srvs::EmptyResponse& response);
+  bool AutolandCallback(std_srvs::EmptyRequest& request, std_srvs::EmptyResponse& response);
   bool BackToPositionHoldCallback(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
 
   void publishAttitudeCommand(const mav_msgs::RollPitchYawrateThrust& command);

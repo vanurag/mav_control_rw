@@ -102,6 +102,7 @@ struct GroundTruthUpdate
 
 struct BackToPositionHold {};
 struct Takeoff {};
+struct Autoland {};
 struct OdometryWatchdog {};
 
 class StateMachineDefinition;
@@ -193,6 +194,7 @@ class StateMachineDefinition : public msm_front::state_machine_def<StateMachineD
       msm_front::Row<PositionHold, GroundTruthUpdate, InternalTransition, SetGroundTruth, NoGuard >,
       msm_front::Row<PositionHold, ReferenceUpdate, InternalTransition, SetReferencePosition, NoGuard >,
       msm_front::Row<PositionHold, OdometryWatchdog, RemoteControl, PrintOdometryWatchdogWarning, OdometryOutdated >,
+      msm_front::Row<PositionHold, Autoland, RemoteControl, NoAction, NoGuard >,
       //  +---------+-------------+---------+---------------------------+----------------------+
       msm_front::Row<RcTeleOp, RcUpdate, RemoteControl, NoAction, RcModeManual>,
       msm_front::Row<RcTeleOp, BackToPositionHold, PositionHold, NoAction, NoGuard>,
@@ -201,7 +203,8 @@ class StateMachineDefinition : public msm_front::state_machine_def<StateMachineD
       //msm_front::Row<RcTeleOp, RcUpdate, InternalTransition, SetReferenceToCurrentPosition, RcInactivePosition >,
       msm_front::Row<RcTeleOp, OdometryUpdate, InternalTransition, SetOdometryAndCompute, NoGuard>,
       msm_front::Row<RcTeleOp, GroundTruthUpdate, InternalTransition, SetGroundTruth, NoGuard >,
-      msm_front::Row<RcTeleOp, OdometryWatchdog, RemoteControl, PrintOdometryWatchdogWarning, OdometryOutdated >
+      msm_front::Row<RcTeleOp, OdometryWatchdog, RemoteControl, PrintOdometryWatchdogWarning, OdometryOutdated >,
+      msm_front::Row<RcTeleOp, Autoland, RemoteControl, NoAction, NoGuard >
       >
   {
   };
@@ -579,10 +582,10 @@ private:
     void operator()(const Evt& evt, FSM& fsm, SourceState&, TargetState&)
     {
       if (!fsm.use_rc_teleop_) {
-        ROS_WARN_STREAM("No odometry message received in the last "<< kOdometryOutdated_ns/1000000000.0 << " seconds!");
+        ROS_WARN_STREAM("Odometry outdated!");
       } else {
         ROS_WARN_STREAM(
-            "No odometry message received in the last "<< kOdometryOutdated_ns/1000000000.0 << " seconds!"
+            "Odometry outdated!"
             " -- going back to manual remote control");
       }
     }
@@ -644,18 +647,21 @@ private:
       fsm.geo_fence_publisher_.publish(fsm.geo_fence_marker_);
       if (std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_state_.timestamp_ns) > kOdometryOutdated_ns) {
         ROS_WARN_STREAM("No odometry message received in the last "<< kOdometryOutdated_ns/1000000000.0 << " seconds!");
+        if (fsm.alert_counter_ % 4 == 0) {
+          fsm.sound_request_.arg = "odometry lost";
+          fsm.sound_publisher_.publish(fsm.sound_request_);
+        }
+        fsm.alert_counter_++;
         return true;
       }
 
       if (std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_groundtruth_.first) > 5.0*kOdometryOutdated_ns) {
         ROS_WARN_STREAM("No groundtruth message received in the last "<< kOdometryOutdated_ns/1000000000.0 << " seconds!");
-        ROS_FATAL("BUT REMOVED TRIGGER, SO NOTHING SHOULD HAPPEN!!");
         if (fsm.alert_counter_ % 4 == 0) {
           fsm.sound_request_.arg = "groundtruth lost";
           fsm.sound_publisher_.publish(fsm.sound_request_);
         }
         fsm.alert_counter_++;
-//        return true;
         return false;
       }
 
@@ -669,13 +675,11 @@ private:
           fsm.current_groundtruth_I_.second(2,3) <= fsm.geo_fence_.z_range.first ||
           fsm.current_groundtruth_I_.second(2,3) >= fsm.geo_fence_.z_range.second) {
         ROS_WARN_STREAM("MAV outside the geo-fence!");
-        ROS_FATAL("BUT REMOVED TRIGGER, SO NOTHING SHOULD HAPPEN!!");
         if (fsm.alert_counter_ % 4 == 0) {
           fsm.sound_request_.arg = "fence breached";
           fsm.sound_publisher_.publish(fsm.sound_request_);
         }
         fsm.alert_counter_++;
-//        return true;
         return false;
       }
 
@@ -696,14 +700,25 @@ private:
 
       if (state_divergence > 1.0) {
         ROS_WARN("State diverging from groundtruth!!!!");
-        ROS_FATAL("BUT REMOVED TRIGGER, SO NOTHING SHOULD HAPPEN!!");
+
+        if (std::abs(fsm.current_groundtruth_.first - fsm.current_state_.timestamp_ns) < 0.2*1.0e9) {
+          ROS_WARN_STREAM("...and GT and state timestamps are " << std::abs(fsm.current_groundtruth_.first - fsm.current_state_.timestamp_ns)/1.0e9 << " secs apart");
+          ROS_FATAL("BUT REMOVED TRIGGER, SO NOTHING SHOULD HAPPEN!!");
+          if (fsm.alert_counter_ % 4 == 0) {
+            fsm.sound_request_.arg = "state diverging. triggering e stop";
+            fsm.sound_publisher_.publish(fsm.sound_request_);
+          }
+          fsm.alert_counter_++;
+          return false;
+//          return true;
+        }
+
         if (fsm.alert_counter_ % 4 == 0) {
           fsm.sound_request_.arg = "state diverging";
           fsm.sound_publisher_.publish(fsm.sound_request_);
         }
         fsm.alert_counter_++;
         return false;
-//        return true;
       }
 
       fsm.alert_counter_ = 0;
