@@ -48,7 +48,7 @@ StateMachineDefinition::StateMachineDefinition(const ros::NodeHandle& nh, const 
 
   geo_fence_.x_range.first = -3.85;
   geo_fence_.x_range.second = 0.95;
-  geo_fence_.y_range.first = -3.0;
+  geo_fence_.y_range.first = -2.5;
   geo_fence_.y_range.second = 1.65;
   geo_fence_.z_range.first = 0.0;
   geo_fence_.z_range.second = 5.5;

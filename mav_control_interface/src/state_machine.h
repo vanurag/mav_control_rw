@@ -334,8 +334,9 @@ private:
       command.pitch = evt.rc_data.right_up_down * fsm.parameters_.rc_max_roll_pitch_command_;
       command.roll = evt.rc_data.right_side * fsm.parameters_.rc_max_roll_pitch_command_;
       command.yaw_rate = -evt.rc_data.left_side * fsm.parameters_.rc_max_yaw_rate_command_;
-      constexpr double thrust_below_hovering_factor = 0.9;
+      constexpr double thrust_below_hovering_factor = 0.85;
       command.thrust.z() = (evt.rc_data.left_up_down + 1.0) * fsm.controller_->getMass() * 9.81 * thrust_below_hovering_factor;
+//      ROS_INFO("Setting thrust at 85%");
       fsm.PublishAttitudeCommand(command);
     }
   };
