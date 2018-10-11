@@ -647,11 +647,11 @@ private:
       fsm.geo_fence_publisher_.publish(fsm.geo_fence_marker_);
       if (std::abs(static_cast<int64_t>(ros::Time::now().toNSec()) - fsm.current_state_.timestamp_ns) > kOdometryOutdated_ns) {
         ROS_WARN_STREAM("No odometry message received in the last "<< kOdometryOutdated_ns/1000000000.0 << " seconds!");
-        if (fsm.alert_counter_ % 4 == 0) {
-          fsm.sound_request_.arg = "odometry lost";
-          fsm.sound_publisher_.publish(fsm.sound_request_);
-        }
-        fsm.alert_counter_++;
+        //if (fsm.alert_counter_ % 4 == 0) {
+        //  fsm.sound_request_.arg = "odometry lost";
+        //  fsm.sound_publisher_.publish(fsm.sound_request_);
+        //}
+        //fsm.alert_counter_++;
         return true;
       }
 
@@ -697,6 +697,7 @@ private:
 
       ROS_INFO_STREAM("watchdog current state pos: " << Eigen::Matrix4d(T_W_B*T_B_V).block(0,3,3,1));
       ROS_INFO_STREAM("state divergence: " << state_divergence);
+      ROS_INFO_STREAM("GT and state timestamps are " << std::abs(fsm.current_groundtruth_.first - fsm.current_state_.timestamp_ns)/1.0e9 << " secs apart");
 
       if (state_divergence > 1.0) {
         ROS_WARN("State diverging from groundtruth!!!!");
